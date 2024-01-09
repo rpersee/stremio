@@ -1,0 +1,71 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: stremio-server
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: stremio
+  template:
+    metadata:
+      labels:
+        app: stremio
+    spec:
+      volumes:
+        - name: openvpn-configuration
+          configMap:
+            name: openvpn-configuration
+            items:
+              - key: custom.ovpn
+                path: custom.conf
+      containers:
+        - name: gluetun
+          image: ghcr.io/qdm12/gluetun
+          securityContext:
+            capabilities:
+              add: ["NET_ADMIN"]
+          env:
+            - name: TZ
+              value: Europe/Paris
+            - name: VPN_SERVICE_PROVIDER
+              value: custom
+            - name: OPENVPN_CUSTOM_CONFIG
+              value: /gluetun/custom.conf 
+            - name: OPENVPN_USER
+              valueFrom:
+                secretKeyRef:
+                  name: openvpn-credentials
+                  key: username
+            - name: OPENVPN_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: openvpn-credentials
+                  key: password
+          volumeMounts:
+            - name: openvpn-configuration
+              mountPath: /gluetun/custom.conf
+              subPath: custom.conf
+              readOnly: true
+        - name: stremio-server
+          image: ghrc.io/rpersee/stremio/server
+          # Add any additional container configuration here
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: stremio-client
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: stremio
+  template:
+    metadata:
+      labels:
+        app: stremio
+    spec:
+      containers:
+        - name: stremio-client
+          image: ghrc.io/rpersee/stremio/client
+          # Add any additional container configuration here
