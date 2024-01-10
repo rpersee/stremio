@@ -1,9 +1,8 @@
-ARG DEBIAN_CODENAME=bullseye
-ARG NODE_VERSION=14
+ARG NODE_VERSION=16
 
-FROM node:${NODE_VERSION}-${DEBIAN_CODENAME} as builder
+FROM node:${NODE_VERSION}-alpine as builder
 
-RUN apt-get update && apt-get install -y jq
+RUN apk add --no-cache curl git jq
 
 WORKDIR /stremio-web
 
@@ -14,18 +13,17 @@ RUN if [ -z "${STREMIO_VERSION}" ]; then \
     fi && \
     git clone --branch "${STREMIO_VERSION}" --depth 1 https://github.com/Stremio/stremio-web.git .
 
-# fake TTY overwise npm install fails
-RUN script -q -c "npm ci --only=prod" /dev/null
+RUN yarn install
 
-RUN npm run build
+RUN yarn build
 
-FROM node:${NODE_VERSION}-${DEBIAN_CODENAME}-slim
+FROM node:${NODE_VERSION}-alpine
 
 WORKDIR /app
 
 COPY --from=builder /stremio-web/build /app/dist
 
-RUN npm install -g http-server
+RUN yarn global add http-server
 
 EXPOSE 8080
 

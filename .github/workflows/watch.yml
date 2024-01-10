@@ -47,14 +47,14 @@ jobs:
               {
                 "context": "./client",
                 "dockerfile": "./client/Dockerfile",
-                "image": "stremio-client",
+                "image": "client",
                 "version": "${STREMIO_CLIENT}",
                 "build-args": "STREMIO_VERSION=${STREMIO_CLIENT}"
               },
               {
                 "context": "./server",
                 "dockerfile": "./server/Dockerfile",
-                "image": "stremio-server",
+                "image": "server",
                 "version": "${STREMIO_SERVER}",
                 "build-args": "STREMIO_VERSION=${STREMIO_SERVER}"
               }
@@ -68,7 +68,7 @@ jobs:
         if: steps.git-status.outputs.modified == 'true'
         run: |
           git config --global user.name 'Ryan Persée'
-          git config --global user.email '12345678+rpersee@users.noreply.github.com'
+          git config --global user.email '98691129+rpersee@users.noreply.github.com'
           git commit -am "Update versions"
           git push
 
