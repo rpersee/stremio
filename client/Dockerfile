@@ -14,7 +14,8 @@ RUN if [ -z "${STREMIO_VERSION}" ]; then \
     fi && \
     git clone --branch "${STREMIO_VERSION}" --depth 1 https://github.com/Stremio/stremio-web.git .
 
-RUN npm install --production
+# fake TTY overwise npm install fails
+RUN script -q -c "npm ci --only=prod" /dev/null
 
 RUN npm run build
 

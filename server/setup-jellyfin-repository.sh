@@ -8,6 +8,13 @@ DPKG_ARCHITECTURE="$( dpkg --print-architecture )"
 
 KEYRING_FILE="${KEYRING_FILE:-/etc/apt/trusted.gpg.d/jellyfin.gpg}"
 
+echo "> Installing prerequisites."
+apt-get update && apt-get install -y --no-install-recommends \
+    curl gnupg ca-certificates
+
+echo "> Cleaning up APT cache."
+apt-get clean && rm -rf /var/lib/apt/lists/*
+
 echo "> Creating APT keyring directory."
 mkdir -p "$( dirname "${KEYRING_FILE}" )"
 

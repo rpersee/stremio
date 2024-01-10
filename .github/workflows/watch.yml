@@ -1,0 +1,80 @@
+name: Watch for new releases
+
+on:
+  schedule:
+    - cron: '0 0 * * *'
+  workflow_dispatch:
+
+permissions:
+  actions: write
+  contents: write
+  packages: write
+
+jobs:
+  versions:
+    runs-on: ubuntu-latest
+
+    outputs:
+      matrix: ${{ steps.set-matrix.outputs.matrix }}
+      updated: ${{ steps.git-status.outputs.modified }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+
+      - name: Fetch latest tags
+        run: |
+          curl -fsSL https://api.github.com/repos/Stremio/stremio-web/releases/latest \
+            | jq -r '"STREMIO_CLIENT=\(.tag_name)"' \
+            | tee VERSIONS
+          curl -fsSL https://raw.githubusercontent.com/Stremio/stremio-shell/master/server-url.txt \
+            | awk -F'/' '{ printf "STREMIO_SERVER=%s", $(NF-2) }' \
+            | tee -a VERSIONS
+
+      - name: Check if tags changed
+        id: git-status
+        run: |
+          [ -z "$(git status --porcelain)" ] && echo "modified=false" || echo "modified=true" >> $GITHUB_OUTPUT
+
+      - name: Set build matrix
+        id: set-matrix
+        run: |
+          source VERSIONS
+          echo "matrix<<EOF" >> $GITHUB_OUTPUT
+          cat <<EOF >> $GITHUB_OUTPUT
+          {
+            "include": [
+              {
+                "context": "./client",
+                "dockerfile": "./client/Dockerfile",
+                "image": "stremio-client",
+                "version": "${STREMIO_CLIENT}",
+                "build-args": "STREMIO_VERSION=${STREMIO_CLIENT}"
+              },
+              {
+                "context": "./server",
+                "dockerfile": "./server/Dockerfile",
+                "image": "stremio-server",
+                "version": "${STREMIO_SERVER}",
+                "build-args": "STREMIO_VERSION=${STREMIO_SERVER}"
+              }
+            ]
+          }
+          EOF
+          echo "EOF" >> $GITHUB_OUTPUT
+        shell: /usr/bin/bash -o allexport -e {0}
+
+      - name: Commit and push changes
+        if: steps.git-status.outputs.modified == 'true'
+        run: |
+          git config --global user.name 'Ryan Persée'
+          git config --global user.email '12345678+rpersee@users.noreply.github.com'
+          git commit -am "Update versions"
+          git push
+
+  images:
+    needs: versions
+    if: needs.versions.outputs.updated == 'true'
+    uses: ./.github/workflows/docker.yml
+    with:
+      build-matrix: ${{ needs.versions.outputs.matrix }}
