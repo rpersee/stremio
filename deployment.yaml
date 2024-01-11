@@ -2,15 +2,20 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: stremio-server
+  labels:
+    app: stremio
+    role: server
 spec:
   replicas: 1
   selector:
     matchLabels:
       app: stremio
+      role: server
   template:
     metadata:
       labels:
         app: stremio
+        role: server
     spec:
       volumes:
         - name: openvpn-configuration
@@ -48,24 +53,43 @@ spec:
               subPath: custom.conf
               readOnly: true
         - name: stremio-server
-          image: ghrc.io/rpersee/stremio/server
-          # Add any additional container configuration here
+          image: ghcr.io/rpersee/stremio/server:4.20.3
+          ports:
+            - containerPort: 11470
+          readinessProbe:
+            exec:
+              command:
+                - /bin/sh
+                - -c
+                - |
+                  awk 'BEGIN {rc=1} $1 == "tun0" && $2 == "00000000" {rc=0} END {exit rc}' /proc/net/route
+            initialDelaySeconds: 10
+            periodSeconds: 30
+            timeoutSeconds: 5
+            successThreshold: 1
+            failureThreshold: 1
 ---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: stremio-client
+  labels:
+    app: stremio
+    role: client
 spec:
   replicas: 1
   selector:
     matchLabels:
       app: stremio
+      role: client
   template:
     metadata:
       labels:
         app: stremio
+        role: client
     spec:
       containers:
         - name: stremio-client
-          image: ghrc.io/rpersee/stremio/client
-          # Add any additional container configuration here
+          image: ghcr.io/rpersee/stremio/client:5.0.0-beta.4
+          ports:
+            - containerPort: 8080
