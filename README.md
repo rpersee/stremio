@@ -21,9 +21,9 @@ OPENVPN_IPADDR="$(getent hosts "$OPENVPN_REMOTE" | awk '{print $1}')"
 sed "s/${OPENVPN_REMOTE}/${OPENVPN_IPADDR}/g" "${OPENVPN_FILEPATH}" > custom.ovpn
 ```
 
-Create a configmap with your OpenVPN configuration:
+Create a secret with your OpenVPN configuration:
 ```bash
-kubectl create configmap openvpn-configuration \
+kubectl create secret generic openvpn-configuration \
     --from-file=custom.ovpn \
     --namespace stremio
 ```
