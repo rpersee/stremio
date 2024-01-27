@@ -1,0 +1,91 @@
+{{- if .Values.server.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "stremio.fullname" . }}-server
+  labels:
+    {{- include "stremio.labels" . | nindent 4 }}
+    app.kubernetes.io/component: server
+spec:
+  replicas: {{ .Values.server.replicaCount }}
+  selector:
+    matchLabels:
+      {{- include "stremio.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: server
+  template:
+    metadata:
+      {{- with .Values.server.podAnnotations }}
+      annotations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      labels:
+        {{- include "stremio.labels" . | nindent 8 }}
+        app.kubernetes.io/component: server
+	{{- with .Values.server.podLabels }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+    spec:
+      containers:
+        - name: gluetun
+          image: "{{ .Values.server.openvpn.image.repository }}:{{ .Values.server.openvpn.image.tag }}"
+          imagePullPolicy: {{ .Values.server.openvpn.image.pullPolicy }}
+          securityContext:
+            capabilities:
+              add: ["NET_ADMIN"]
+          env:
+            - name: TZ
+              value: {{ .Values.server.openvpn.timezone }}
+            - name: VPN_SERVICE_PROVIDER
+              value: custom
+            - name: OPENVPN_CUSTOM_CONFIG
+              value: /gluetun/custom.conf
+            - name: OPENVPN_USER
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.server.openvpn.credentials.secretName }}
+                  key: {{ .Values.server.openvpn.credentials.usernameKey }}
+            - name: OPENVPN_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.server.openvpn.credentials.secretName }}
+                  key: {{ .Values.server.openvpn.credentials.passwordKey }}
+          volumeMounts:
+            - name: openvpn-configuration
+              mountPath: /gluetun/custom.conf
+              subPath: custom.conf
+              readOnly: true
+          resources:
+            {{- toYaml .Values.server.openvpn.resources | nindent 12 }}
+        - name: {{ .Chart.Name }}-server
+          image: "{{ .Values.server.image.repository }}:{{ .Values.server.image.tag }}"
+          imagePullPolicy: {{ .Values.server.image.pullPolicy }}
+          ports:
+            - name: http
+              containerPort: 11470
+              protocol: TCP
+          livenessProbe:
+            httpGet:
+              path: /
+              port: http
+          readinessProbe:
+            exec:
+              command:
+              - /bin/sh
+              - -c
+              - |
+                awk 'BEGIN {rc=1} $1 == "tun0" && $2 == "00000000" {rc=0} END {exit rc}' /proc/net/route
+            initialDelaySeconds: 10
+            periodSeconds: 30
+            timeoutSeconds: 5
+            successThreshold: 1
+            failureThreshold: 1
+          resources:
+            {{- toYaml .Values.server.resources | nindent 12 }}
+      volumes:
+        - name: openvpn-configuration
+          secret:
+            secretName: {{ .Values.server.openvpn.configuration.secretName }}
+            items:
+            - key: {{ .Values.server.openvpn.configuration.filenameKey }}
+              path: custom.conf
+{{- end }}
